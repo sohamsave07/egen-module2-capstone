@@ -44,17 +44,24 @@ def get_combined_records():
         file_df = pd.read_csv(f"/home/airflow/gcs/data/egen/{filename}")
         combined_df = combined_df.append(file_df)
 
+        print(f"Deleting file {filename}")
+        blob.delete()
+
     if len(combined_df) > 0:
         combined_filename = f"combined_files.csv"
         combined_df.to_csv(f'/home/airflow/gcs/data/egen/{combined_filename}', index=False)
         print("Found files moving ahead...")
-        return "upload_to_bigquery_task"
+        return "clean_and_process_records_task"
 
     else:
         print("No files found, ending this run")
         return "end"
 
-
+def clean_and_process_records():
+    df = pd.read_csv('/home/airflow/gcs/data/egen/combined_files.csv')
+    print("Renaming columns")
+    df.rename(columns={"p":"price","s":"symbol","b":"bid","a":"ask","t":"timestamp"})
+    df.to_csv('/home/airflow/gcs/data/egen/cleaned_files.csv', index=False)
 
 def upload_to_bigquery():
     client = bigquery.Client()
@@ -79,7 +86,7 @@ def upload_to_bigquery():
         autodetect=True
     )
 
-    uri= f'gs://us-central1-egen-module2-068902e1-bucket/data/egen/combined_files.csv'
+    uri= f'gs://us-central1-egen-module2-068902e1-bucket/data/egen/cleaned_files.csv'
 
     load_job = client.load_table_from_uri(uri, table_id, job_config=job_config)
 
@@ -93,9 +100,15 @@ def upload_to_bigquery():
 start = DummyOperator(task_id="start",dag=dag)
 end = DummyOperator(task_id="end",dag=dag)
 
-get_combined_records_task = PythonOperator(
+get_combined_records_task = BranchPythonOperator(
     task_id='get_combined_records_task',
     python_callable=get_combined_records,
+    dag=dag
+)
+
+clean_and_process_records_task = PythonOperator(
+    task_id='clean_and_process_records_task',
+    python_callable=clean_and_process_records,
     dag=dag
 )
 
@@ -105,4 +118,5 @@ upload_to_bigquery_task = PythonOperator(
     dag=dag
 )
 
-start >> get_combined_records_task >> upload_to_bigquery_task >> end
+start >> get_combined_records_task >> clean_and_process_records_task >> upload_to_bigquery_task >> end
+get_combined_records_task >> end

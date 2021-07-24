@@ -1,10 +1,12 @@
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
+from decouple import config
 import requests
 
 
 IAM_SCOPE = 'https://www.googleapis.com/auth/iam'
 OAUTH_TOKEN_URI = 'https://www.googleapis.com/oauth2/v4/token'
+
 
 
 def trigger_dag(data, context=None):
@@ -24,10 +26,10 @@ def trigger_dag(data, context=None):
     # Navigate to your webserver's login page and get this from the URL
     # Or use the script found at
     # https://github.com/GoogleCloudPlatform/python-docs-samples/blob/master/composer/rest/get_client_id.py
-    client_id = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=861377977853-eugk82lah1en30ch7989m58esavth54c.apps.googleusercontent.com'
+    client_id = config('CLIENT_ID')
     # This should be part of your webserver's URL:
     # {tenant-project-id}.appspot.com
-    webserver_id = 'u1a0ebe1015513c12p-tp'
+    webserver_id = config('WEBSERVER_ID')
     # The name of the DAG you wish to trigger
     dag_name = 'processes_dag'
     webserver_url = (
